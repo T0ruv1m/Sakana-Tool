@@ -1,0 +1,7 @@
+pandas
+pypdf
+pyMuPDF
+pillow
+openpyxl
+pyzbar
+tkinter
