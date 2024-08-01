@@ -1,7 +1,6 @@
 pandas
 pypdf
-pyMuPDF
+PyMuPDF==1.24.8
 pillow
 openpyxl
 pyzbar
-tkinter

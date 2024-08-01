@@ -17,7 +17,7 @@ excel_file = os.path.join(pato, '../xlsx/extracted_data.xlsx')
 notas_fiscais_dir = os.path.join(output_dir, "Notas Fiscais")
 notas_transporte_dir = os.path.join(output_dir, "Notas de Transporte")
 
-# Criar diretorios que não existem:
+# Criar diretórios que não existem:
 if not os.path.exists(input_dir):
     os.makedirs(input_dir)
 
@@ -31,6 +31,8 @@ if not os.path.exists(notas_transporte_dir):
 pdf_files = []
 current_pdf_index = 0
 history = []
+barcode_history = []  # Store history of entered barcodes
+history_index = -1  # Index to track current position in history
 
 def construct_database():
     # Convert Excel File to Panda Dataframe
@@ -43,7 +45,7 @@ def load_pdf_files():
     pdf_files = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith(".pdf")]
     pdf_files.sort()  # Optional: Sort files if you want a specific order
 
-def display_pdf_first_page(pdf_path, canvas):
+def display_pdf_first_page(pdf_path, canvas, magnification_factor=1.5):
     # Open the PDF
     doc = fitz.open(pdf_path)
     page = doc.load_page(0)
@@ -52,9 +54,14 @@ def display_pdf_first_page(pdf_path, canvas):
     pix = page.get_pixmap()
     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
     
+    # Magnify the image
+    new_width = int(pix.width * magnification_factor)
+    new_height = int(pix.height * magnification_factor)
+    magnified_img = img.resize((new_width, new_height), Image.LANCZOS)
+    
     # Display the image
-    tk_img = ImageTk.PhotoImage(img)
-    canvas.config(width=800, height=600)  # Set a fixed size for the canvas
+    tk_img = ImageTk.PhotoImage(magnified_img)
+    canvas.config(width="600", height="600")  # Adjust canvas size based on the image size
     canvas.create_image(0, 0, anchor=tk.NW, image=tk_img)
     canvas.image = tk_img  # Keep a reference to avoid garbage collection
     
@@ -78,9 +85,8 @@ def process_next_pdf():
     barcode_entry.config(state=tk.NORMAL)
     assign_button.config(state=tk.NORMAL)
 
-
 def assign_barcode(event=None):
-    global current_pdf_index
+    global current_pdf_index, history_index
     if current_pdf_index >= len(pdf_files):
         messagebox.showinfo("Completo", "Todos os PDFs foram processados!")
         return
@@ -91,6 +97,10 @@ def assign_barcode(event=None):
     if not key:
         messagebox.showwarning("Erro de entrada", "Por favor digite um código de barras.")
         return
+    
+    # Store the barcode in the history list
+    if key not in barcode_history:
+        barcode_history.append(key)
     
     target_dir = ""
     if key in df['chNFe'].values:
@@ -127,6 +137,9 @@ def assign_barcode(event=None):
     # Move to the next PDF file
     current_pdf_index += 1
     process_next_pdf()
+
+    # Reset history index after each entry
+    history_index = -1
 
 def merge_pdfs(existing_file, new_file):
     # Open the existing PDF
@@ -165,17 +178,28 @@ def undo_last_action(event=None):
     else:
         messagebox.showinfo("Undo", "Nenhuma ação para desfazer.")
 
-def format_barcode_entry(*args):
-    value = barcode_entry_var.get()
-    value = value.replace(" ", "")  # Remove any existing spaces
-    formatted_value = " ".join(value[i:i+4] for i in range(0, len(value), 4))
-    barcode_entry_var.set(formatted_value)
 
 def refresh_files():
     global current_pdf_index
     load_pdf_files()
     current_pdf_index = 0
     process_next_pdf()
+
+def previous_entry(event=None):
+    """ Navigate to the previous barcode entry using the Up key """
+    global history_index
+    if barcode_history and history_index > 0:
+        history_index -= 1
+        barcode_entry_var.set(barcode_history[history_index])
+        barcode_entry.icursor(tk.END)  # Move cursor to end
+
+def next_entry(event=None):
+    """ Navigate to the next barcode entry using the Down key """
+    global history_index
+    if barcode_history and history_index < len(barcode_history) - 1:
+        history_index += 1
+        barcode_entry_var.set(barcode_history[history_index])
+        barcode_entry.icursor(tk.END)  # Move cursor to end
 
 # Carrega a base de dados do pandas
 construct_database()
@@ -186,8 +210,8 @@ window = tk.Tk()
 window.title("Sakana Capture")
 
 # Set fixed size for the window
-window.geometry("620x768")  # Adjust as needed
-window.minsize(600, 600)  # Set minimum size to ensure scrollbars work
+window.geometry("900x768")  # Adjust as needed
+window.minsize(800, 600)  # Set minimum size to ensure scrollbars work
 
 # Create a frame to hold the canvas and scrollbar
 canvas_frame = tk.Frame(window)
@@ -212,8 +236,6 @@ barcode_entry_var = tk.StringVar()
 barcode_entry = tk.Entry(frame, textvariable=barcode_entry_var, state=tk.DISABLED, width=49)
 barcode_entry.grid(row=0, column=1, padx=5)
 
-barcode_entry_var.trace("w", format_barcode_entry)
-
 # Button to the right of the entry
 assign_button = tk.Button(frame, text="Associar Código", command=assign_barcode, state=tk.DISABLED)
 assign_button.grid(row=0, column=2, padx=5, pady=5, sticky=tk.W)
@@ -232,6 +254,10 @@ refresh_button.pack(side=tk.TOP, anchor=tk.W, padx=0, pady=0)  # Place in the to
 window.bind('<Return>', assign_barcode)
 # Bind Ctrl+Z to undo_last_action function
 window.bind('<Control-z>', undo_last_action)
+
+# Bind Up and Down keys for navigating barcode history
+window.bind('<Up>', previous_entry)
+window.bind('<Down>', next_entry)
 
 # Start processing the first PDF
 process_next_pdf()
