@@ -13,7 +13,7 @@ install_packages = "install_packages.py"
 Sakana_C_Dir = os.path.join(path, Capture)
 Sakana_F_Dir = os.path.join(path, Fusion)
 extract_xml2dir = os.path.join(path, xml)
-
+install_packages_dir = os.path.join(path, install_packages)
 
 def update_pip():
     try:
@@ -22,10 +22,6 @@ def update_pip():
         print("Pip has been successfully updated.")
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while updating pip: {e}")
-
-if __name__ == "__main__":
-    update_pip()
-
 
 def run_subprocess(script_path):
     # Hide the main window
@@ -53,11 +49,15 @@ root = tk.Tk()
 root.title("Sakana Tool")
 root.geometry("200x200")
 
-# Run the subprocess for extract_xml2
-run_subprocess(extract_xml2dir)
+# Define the path to the .xlsx file
+xlsx_file = "../xlsx/extracted_data.xlsx"  # Replace with the actual path to the .xlsx file
 
-#Run the subprocess for installing dependecies
-run_subprocess(install_packages)
+# Run the subprocess for extract_xml2 only if the .xlsx file does not exist
+if not os.path.exists(xlsx_file):
+    run_subprocess(extract_xml2dir)
+
+# Run the subprocess for installing dependencies
+# run_subprocess(install_packages_dir)
 
 # Create and place the buttons
 button1 = tk.Button(root, text="Registrar Notas", command=sub_program1, width=20, height=2)
